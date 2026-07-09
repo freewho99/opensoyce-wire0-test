@@ -1,0 +1,30 @@
+name: OpenSoyce PR walkthrough
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pr-walkthrough:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the PR's own branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Generate the PR walkthrough
+        uses: freewho99/opensoyce/actions/pr-walkthrough@phase0-gha-0
+        with:
+          pr-url: ${{ github.event.pull_request.html_url }}
+          pr-number: ${{ github.event.pull_request.number }}
+          repository: ${{ github.repository }}
+          repo-private: ${{ github.event.repository.private }}
+          provider: openai
+          api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
