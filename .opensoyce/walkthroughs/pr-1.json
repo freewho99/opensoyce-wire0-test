@@ -1,0 +1,915 @@
+{
+  "meta": {
+    "title": "React PR #36947 — [Fiber] Detect useSyncExternalStore mutations missed while Activity tree was hidden",
+    "subtitle": "",
+    "filesChanged": 2,
+    "linesAdded": 148,
+    "linesRemoved": 10,
+    "tags": [
+      "phase0-m2"
+    ],
+    "provenance": {
+      "generator": "phase0",
+      "version": "0.1.0-m1",
+      "model": "claude-sonnet-5",
+      "generatedAt": "2026-07-08T04:33:07.187Z"
+    }
+  },
+  "overview": {
+    "lead": "The change addresses detection of useSyncExternalStore mutations that occur while a component tree is hidden inside a React Activity boundary, updating the reconciler's hook logic and adding corresponding tests.",
+    "bullets": [
+      {
+        "title": "ReactFiberHooks.js changes",
+        "body": "Adjusts the logic useSyncExternalStore uses to detect missed store mutations, specifically extending it to handle fibers hidden within an Activity subtree so that changes occurring during hidden periods are not silently dropped."
+      },
+      {
+        "title": "useSyncExternalStore-test.js additions",
+        "body": "Adds test cases exercising the scenario of a store mutation happening while part of the tree is hidden by Activity, intended to validate the reconciler-side fix."
+      }
+    ],
+    "callouts": [
+      {
+        "title": "Shared code path",
+        "body": "The detection logic being modified is shared with the standard (non-hidden) useSyncExternalStore check-for-changes flow, so changes here can affect behavior outside the Activity-specific scenario."
+      },
+      {
+        "title": "Transition coverage",
+        "body": "Whether tests cover all hide/mutate/reveal orderings, including nested Activity boundaries, is worth checking directly against the added test cases."
+      }
+    ]
+  },
+  "clusters": [
+    {
+      "name": "Cluster A · Detect missed useSyncExternalStore mutations after hidden Activity trees",
+      "files": [
+        {
+          "path": "packages/react-reconciler/src/ReactFiberHooks.js",
+          "risk": "med",
+          "riskLabel": "Passive effect for useSyncExternalStore is now always pushed, changing effect-list shape and re-run conditions",
+          "why": "Core logic change: the store-mutation-check effect is unconditionally queued so it reconnects when a hidden Activity subtree is revealed",
+          "what": "Previously the effect (and its consistency-check scheduling) were only pushed when storeChanged was true; now pushSimpleEffect always runs, tagged with HookHasEffect only when storeChanged, so the effect re-runs on passive-effect reconnection even without a detected change. This relies on commit-phase logic to skip untagged effects correctly, and on updateStoreInstance's checkIfSnapshotChanged to catch mutations that happened while unsubscribed during hidden Activity.",
+          "before": [
+            {
+              "t": "ctx",
+              "c": "  if ("
+            },
+            {
+              "t": "del",
+              "c": "    inst.getSnapshot !== getSnapshot ||"
+            },
+            {
+              "t": "del",
+              "c": "    snapshotChanged ||"
+            },
+            {
+              "t": "del",
+              "c": "    // Check if the subscribe function changed. We can save some memory by"
+            },
+            {
+              "t": "del",
+              "c": "    // checking whether we scheduled a subscription effect above."
+            },
+            {
+              "t": "del",
+              "c": "    (workInProgressHook !== null &&"
+            },
+            {
+              "t": "del",
+              "c": "      workInProgressHook.memoizedState.tag & HookHasEffect)"
+            },
+            {
+              "t": "del",
+              "c": "  ) {"
+            },
+            {
+              "t": "ctx",
+              "c": "    fiber.flags |= PassiveEffect;"
+            },
+            {
+              "t": "del",
+              "c": "    pushSimpleEffect("
+            },
+            {
+              "t": "del",
+              "c": "      HookHasEffect | HookPassive,"
+            },
+            {
+              "t": "del",
+              "c": "      createEffectInstance(),"
+            },
+            {
+              "t": "del",
+              "c": "      updateStoreInstance.bind(null, fiber, inst, nextSnapshot, getSnapshot),"
+            },
+            {
+              "t": "del",
+              "c": "      null,"
+            },
+            {
+              "t": "del",
+              "c": "    );"
+            },
+            {
+              "t": "ctx",
+              "c": ""
+            },
+            {
+              "t": "ctx",
+              "c": "    // Unless we're rendering a blocking lane, schedule a consistency check."
+            },
+            {
+              "t": "ctx",
+              "c": "    // Right before committing, we will walk the tree and check if any of the"
+            },
+            {
+              "t": "ctx",
+              "c": "    // stores were mutated."
+            }
+          ],
+          "after": [
+            {
+              "t": "add",
+              "c": "  const storeChanged ="
+            },
+            {
+              "t": "add",
+              "c": "    inst.getSnapshot !== getSnapshot ||"
+            },
+            {
+              "t": "add",
+              "c": "    snapshotChanged ||"
+            },
+            {
+              "t": "add",
+              "c": "    // Check if the subscribe function changed. We can save some memory by"
+            },
+            {
+              "t": "add",
+              "c": "    // checking whether we scheduled a subscription effect above."
+            },
+            {
+              "t": "add",
+              "c": "    (workInProgressHook !== null &&"
+            },
+            {
+              "t": "add",
+              "c": "      (workInProgressHook.memoizedState.tag & HookHasEffect) !== HookNoFlags);",
+              "mk": 1
+            },
+            {
+              "t": "add",
+              "c": "  if (storeChanged) {"
+            },
+            {
+              "t": "add",
+              "c": "    fiber.flags |= PassiveEffect;"
+            },
+            {
+              "t": "add",
+              "c": "  }"
+            },
+            {
+              "t": "add",
+              "c": "  // Even if nothing changed during this render, we push the effect so it is"
+            },
+            {
+              "t": "add",
+              "c": "  // always in the effect list. That way it re-runs whenever the passive"
+            },
+            {
+              "t": "add",
+              "c": "  // effects are reconnected, like when a hidden Activity tree is shown again."
+            },
+            {
+              "t": "add",
+              "c": "  // While the tree was hidden we were not subscribed to the store, so"
+            },
+            {
+              "t": "add",
+              "c": "  // mutations during that window notified nobody, and if the reveal didn't"
+            },
+            {
+              "t": "add",
+              "c": "  // re-render this component (or rendered before the mutation), nothing"
+            },
+            {
+              "t": "add",
+              "c": "  // would ever detect them. When nothing changed, the effect is pushed"
+            },
+            {
+              "t": "add",
+              "c": "  // without the HasEffect tag so a regular commit skips it."
+            },
+            {
+              "t": "add",
+              "c": "  pushSimpleEffect("
+            },
+            {
+              "t": "add",
+              "c": "    storeChanged ? HookHasEffect | HookPassive : HookPassive,",
+              "mk": 2
+            },
+            {
+              "t": "add",
+              "c": "    createEffectInstance(),"
+            },
+            {
+              "t": "add",
+              "c": "    updateStoreInstance.bind(null, fiber, inst, nextSnapshot, getSnapshot),"
+            },
+            {
+              "t": "add",
+              "c": "    null,"
+            },
+            {
+              "t": "add",
+              "c": "  );"
+            },
+            {
+              "t": "ctx",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "  if (storeChanged) {"
+            },
+            {
+              "t": "ctx",
+              "c": "    // Unless we're rendering a blocking lane, schedule a consistency check."
+            },
+            {
+              "t": "ctx",
+              "c": "    // Right before committing, we will walk the tree and check if any of the"
+            },
+            {
+              "t": "ctx",
+              "c": "    // stores were mutated."
+            },
+            {
+              "t": "ctx",
+              "c": "..."
+            },
+            {
+              "t": "del",
+              "c": "  // snapsho and getSnapshot values to bail out. We need to check one more time."
+            },
+            {
+              "t": "add",
+              "c": "  // snapshot and getSnapshot values to bail out. We need to check one more"
+            },
+            {
+              "t": "add",
+              "c": "  // time. This effect also re-runs when a hidden Activity tree is revealed."
+            }
+          ],
+          "annos": [
+            {
+              "text": "Bitwise-and comparison against HookNoFlags rewritten with an explicit '!== HookNoFlags' rather than truthiness check, altering evaluation semantics slightly but not the boolean outcome for tag flags."
+            },
+            {
+              "text": "The effect is now pushed on every render of this hook regardless of storeChanged, with the HasEffect tag conditionally applied -- this depends on the commit phase honoring the tag to skip re-invocation when nothing changed.",
+              "r": "med"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-reconciler/src/__tests__/useSyncExternalStore-test.js",
+          "risk": "lo",
+          "riskLabel": "New regression tests for missed store mutations around hidden Activity subtrees",
+          "why": "Exercises the exact scenario the paired hook fix targets: a store mutation occurring while a subtree is hidden or being revealed via Activity",
+          "what": "Both new tests assert that a mutation happening during the hidden-to-visible transition (via a layout effect or via a direct store.set while hidden) is still detected once the subscriber resubscribes, including the case where the subscriber is memoized and bails out of rendering on reveal.",
+          "beforeType": "gone",
+          "before": [
+            "// no equivalent -- these regression tests did not exist"
+          ],
+          "after": [
+            {
+              "t": "ctx",
+              "c": "  // Regression test for https://github.com/facebook/react/issues/27670"
+            },
+            {
+              "t": "add",
+              "c": "  it('detects store mutations from a layout effect while an Activity subtree is being revealed', async () => {"
+            },
+            {
+              "t": "add",
+              "c": "    const store = createExternalStore('revision:1');"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "    function App({mode, revision}) {"
+            },
+            {
+              "t": "add",
+              "c": "      return ("
+            },
+            {
+              "t": "add",
+              "c": "        <React.Activity mode={mode}>"
+            },
+            {
+              "t": "add",
+              "c": "          <Wrapper revision={revision}>"
+            },
+            {
+              "t": "add",
+              "c": "            <Subscriber />"
+            },
+            {
+              "t": "add",
+              "c": "          </Wrapper>"
+            },
+            {
+              "t": "add",
+              "c": "        </React.Activity>"
+            },
+            {
+              "t": "add",
+              "c": "      );"
+            },
+            {
+              "t": "add",
+              "c": "    }"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "    function Wrapper({children, revision}) {"
+            },
+            {
+              "t": "add",
+              "c": "      useLayoutEffect(() => {"
+            },
+            {
+              "t": "add",
+              "c": "        store.set('revision:' + revision);"
+            },
+            {
+              "t": "add",
+              "c": "      }, [revision]);"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      return ("
+            },
+            {
+              "t": "add",
+              "c": "        <>"
+            },
+            {
+              "t": "add",
+              "c": "          wrapper:{revision}"
+            },
+            {
+              "t": "add",
+              "c": "          {', '}"
+            },
+            {
+              "t": "add",
+              "c": "          {children}"
+            },
+            {
+              "t": "add",
+              "c": "        </>"
+            },
+            {
+              "t": "add",
+              "c": "      );"
+            },
+            {
+              "t": "add",
+              "c": "    }"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "    function Subscriber() {"
+            },
+            {
+              "t": "add",
+              "c": "      const revision = useSyncExternalStore(store.subscribe, store.getState);"
+            },
+            {
+              "t": "add",
+              "c": "      return <Text text={revision} />;"
+            },
+            {
+              "t": "add",
+              "c": "    }"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "    const root = ReactNoop.createRoot();"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "    // Mount the app"
+            },
+            {
+              "t": "add",
+              "c": "    await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "      root.render(<App mode=\"visible\" revision=\"1\" />);"
+            },
+            {
+              "t": "add",
+              "c": "    });"
+            },
+            {
+              "t": "add",
+              "c": "    assertLog(['revision:1']);"
+            },
+            {
+              "t": "add",
+              "c": "    expect(root).toMatchRenderedOutput('wrapper:1, revision:1');"
+            },
+            {
+              "t": "add",
+              "c": "    expect(store.getSubscriberCount()).toBe(1);"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "    // Hide the subtree. React unsubscribes from the store."
+            },
+            {
+              "t": "add",
+              "c": "    await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "      root.render(<App mode=\"hidden\" revision=\"1\" />);"
+            },
+            {
+              "t": "add",
+              "c": "    });"
+            },
+            {
+              "t": "add",
+              "c": "    assertLog(['revision:1']);"
+            },
+            {
+              "t": "add",
+              "c": "    expect(store.getSubscriberCount()).toBe(0);"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "    // Show the subtree again. A layout effect mutates the store during the"
+            },
+            {
+              "t": "add",
+              "c": "    // reveal, after the Subscriber rendered but before it resubscribed. When"
+            },
+            {
+              "t": "add",
+              "c": "    // it resubscribes, it must detect the mutation it missed.",
+              "mk": 1
+            },
+            {
+              "t": "add",
+              "c": "    await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "      root.render(<App mode=\"visible\" revision=\"2\" />);"
+            },
+            {
+              "t": "add",
+              "c": "    });"
+            },
+            {
+              "t": "add",
+              "c": "    assertLog(['revision:1', 'revision:2']);"
+            },
+            {
+              "t": "add",
+              "c": "    expect(store.getSubscriberCount()).toBe(1);"
+            },
+            {
+              "t": "add",
+              "c": "    expect(root).toMatchRenderedOutput('wrapper:2, revision:2');"
+            },
+            {
+              "t": "add",
+              "c": "  });"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "  // Regression test for https://github.com/facebook/react/issues/27670"
+            },
+            {
+              "t": "add",
+              "c": "  it("
+            },
+            {
+              "t": "add",
+              "c": "    'detects store mutations that happened while an Activity subtree was ' +"
+            },
+            {
+              "t": "add",
+              "c": "      'hidden, even if the subtree bails out of rendering when revealed',"
+            },
+            {
+              "t": "add",
+              "c": "    async () => {"
+            },
+            {
+              "t": "add",
+              "c": "      const store = createExternalStore('initial');"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      // Memoized so that revealing the Activity boundary doesn't re-render"
+            },
+            {
+              "t": "add",
+              "c": "      // the subscriber. This matches components memoized by React.memo or"
+            },
+            {
+              "t": "add",
+              "c": "      // React Compiler."
+            },
+            {
+              "t": "add",
+              "c": "      const Subscriber = React.memo(({label}) => {"
+            },
+            {
+              "t": "add",
+              "c": "        const value = useSyncExternalStore(store.subscribe, store.getState);"
+            },
+            {
+              "t": "add",
+              "c": "        return <Text text={label + ':' + value} />;"
+            },
+            {
+              "t": "add",
+              "c": "      });"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      function App({mode, label}) {"
+            },
+            {
+              "t": "add",
+              "c": "        return ("
+            },
+            {
+              "t": "add",
+              "c": "          <React.Activity mode={mode}>"
+            },
+            {
+              "t": "add",
+              "c": "            <Subscriber label={label} />"
+            },
+            {
+              "t": "add",
+              "c": "          </React.Activity>"
+            },
+            {
+              "t": "add",
+              "c": "        );"
+            },
+            {
+              "t": "add",
+              "c": "      }"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      const root = ReactNoop.createRoot();"
+            },
+            {
+              "t": "add",
+              "c": "      await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "        root.render(<App mode=\"visible\" label=\"a\" />);"
+            },
+            {
+              "t": "add",
+              "c": "      });"
+            },
+            {
+              "t": "add",
+              "c": "      assertLog(['a:initial']);"
+            },
+            {
+              "t": "add",
+              "c": "      expect(root).toMatchRenderedOutput('a:initial');"
+            },
+            {
+              "t": "add",
+              "c": "      expect(store.getSubscriberCount()).toBe(1);"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      // Re-render the subscriber once with different props, with no store"
+            },
+            {
+              "t": "add",
+              "c": "      // change. This replaces its effect list with one that contains only"
+            },
+            {
+              "t": "add",
+              "c": "      // the subscription effect, no interleaved mutation check."
+            },
+            {
+              "t": "add",
+              "c": "      await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "        root.render(<App mode=\"visible\" label=\"b\" />);"
+            },
+            {
+              "t": "add",
+              "c": "      });"
+            },
+            {
+              "t": "add",
+              "c": "      assertLog(['b:initial']);"
+            },
+            {
+              "t": "add",
+              "c": "      expect(root).toMatchRenderedOutput('b:initial');"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      // Hide the subtree. React unsubscribes from the store."
+            },
+            {
+              "t": "add",
+              "c": "      await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "        root.render(<App mode=\"hidden\" label=\"b\" />);"
+            },
+            {
+              "t": "add",
+              "c": "      });"
+            },
+            {
+              "t": "add",
+              "c": "      expect(store.getSubscriberCount()).toBe(0);"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      // Mutate the store while the subtree is hidden. Nothing is subscribed,"
+            },
+            {
+              "t": "add",
+              "c": "      // so no update is scheduled."
+            },
+            {
+              "t": "add",
+              "c": "      await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "        store.set('updated');"
+            },
+            {
+              "t": "add",
+              "c": "      });"
+            },
+            {
+              "t": "add",
+              "c": "      assertLog([]);"
+            },
+            {
+              "t": "add",
+              "c": ""
+            },
+            {
+              "t": "add",
+              "c": "      // Show the subtree again. The memoized component bails out of"
+            },
+            {
+              "t": "add",
+              "c": "      // rendering, so resubscribing to the store is the only chance to"
+            },
+            {
+              "t": "add",
+              "c": "      // detect the mutation that happened while it was hidden.",
+              "mk": 2
+            },
+            {
+              "t": "add",
+              "c": "      await act(() => {"
+            },
+            {
+              "t": "add",
+              "c": "        root.render(<App mode=\"visible\" label=\"b\" />);"
+            },
+            {
+              "t": "add",
+              "c": "      });"
+            },
+            {
+              "t": "add",
+              "c": "      assertLog(['b:updated']);"
+            },
+            {
+              "t": "add",
+              "c": "      expect(store.getSubscriberCount()).toBe(1);"
+            },
+            {
+              "t": "add",
+              "c": "      expect(root).toMatchRenderedOutput('b:updated');"
+            },
+            {
+              "t": "add",
+              "c": "    },"
+            },
+            {
+              "t": "add",
+              "c": "  );"
+            },
+            {
+              "t": "add",
+              "c": ""
+            }
+          ],
+          "annos": [
+            {
+              "text": "First test relies on a layout effect firing during the reveal commit, after the subscriber renders but before it resubscribes, to check that the resubscription path re-reads the store rather than trusting the stale render-time snapshot."
+            },
+            {
+              "text": "Second test uses React.memo to force a bailout on reveal, isolating the case where resubscription (not re-render) is the only place a missed mutation can be caught."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "level": "hi",
+      "title": "Mutation detection logic around hidden/offscreen Activity subtrees",
+      "where": "packages/react-reconciler/src/ReactFiberHooks.js",
+      "what": "The change touches how useSyncExternalStore checks for missed store mutations, specifically in relation to fibers that were hidden inside an Activity tree. If the check-for-changes logic (e.g. the memoized snapshot comparison or the scheduling of a re-render on mount/visibility restore) does not correctly re-run for fibers that were offscreen during a mutation, subscribers could resume with stale state after the tree becomes visible again. Because useSyncExternalStore is relied on for tearing-free reads of external stores, an incorrect fix here has a broad blast radius across any consumer using external stores under Activity/Offscreen boundaries."
+    },
+    {
+      "level": "med",
+      "title": "Test coverage scope for hidden-tree mutation scenarios",
+      "where": "packages/react-reconciler/src/__tests__/useSyncExternalStore-test.js",
+      "what": "New or modified tests target the specific scenario of mutations occurring while an Activity subtree is hidden. Whether these tests cover all relevant transitions (mutation before hide, mutation while hidden, mutation during the hide-to-visible transition, and nested Activity boundaries) is checkable only by reading the added test cases; any transition left uncovered would leave the corresponding reconciler code path unverified by this PR."
+    },
+    {
+      "level": "med",
+      "title": "Interaction with existing snapshot-check scheduling",
+      "where": "packages/react-reconciler/src/ReactFiberHooks.js",
+      "what": "useSyncExternalStore already contains logic to detect torn reads via a check-for-changes mechanism invoked at various points in the commit/passive-effect lifecycle. Modifying this logic to account for hidden Activity trees risks altering the timing or frequency of these checks for the common (non-Activity) case as well, since the code path is shared rather than isolated to Activity-specific branches."
+    }
+  ],
+  "smokeTest": [],
+  "summary": "This PR modifies useSyncExternalStore's missed-mutation detection in ReactFiberHooks.js to account for store updates that occur while a subtree is hidden inside an Activity boundary, with accompanying tests added in useSyncExternalStore-test.js. The main review focus is whether the detection/re-check logic correctly triggers for fibers that were offscreen during a mutation and whether the shared check-for-changes code path used by non-Activity consumers remains unaffected; test coverage of the various hide/mutate/reveal orderings is the secondary point to verify against the reconciler change.",
+  "footer": "phase0 M2-generate -- 2 file(s), +148/-10 (real, parsed from the diff)",
+  "archMap": {
+    "reading": [
+      "Before this PR, the React reconciler's useSyncExternalStore mutation detection logic in ReactFiberHooks.js operated without explicit handling for cases when a Fiber subtree was hidden inside an Activity tree, and the test suite in useSyncExternalStore-test.js did not cover mutation scenarios specific to offscreen/hidden Activity trees.",
+      "After this PR, ReactFiberHooks.js is modified to extend the snapshot/mutation detection logic to scenarios where a Fiber is hidden within an Activity subtree. Correspondingly, useSyncExternalStore-test.js is updated to add or modify tests that exercise mutation detection for hidden-then-revealed trees. This pairing directly targets the risk of exposing consumers to stale external store state after hidden Activity boundaries are revealed.",
+      "Key changes are the insertion of new or altered code paths in the reconciler and focused extension of the test suite to cover these transitions. The code and test are now more aligned for scenarios where mutations happen while offscreen, covering more explicit edge cases and surfacing opportunities to detect regressions related to Activity/Offscreen transitions."
+    ],
+    "before": {
+      "swimlanes": [
+        "REACT RECONCILER CORE",
+        "TEST SUITE"
+      ],
+      "nodes": [
+        {
+          "id": "fiber-hooks",
+          "lane": 0,
+          "label": "ReactFiberHooks.js",
+          "sub": "useSyncExternalStore mutation detection logic before Activity-aware fix",
+          "type": "mod",
+          "entity_key": "file:packages/react-reconciler/src/ReactFiberHooks.js"
+        },
+        {
+          "id": "usestore-test",
+          "lane": 1,
+          "label": "useSyncExternalStore-test.js",
+          "sub": "Tests before scenario coverage for Activity-hidden trees",
+          "type": "mod",
+          "entity_key": "file:packages/react-reconciler/src/__tests__/useSyncExternalStore-test.js"
+        }
+      ],
+      "edges": [
+        {
+          "id": "e1",
+          "from": "usestore-test",
+          "to": "fiber-hooks",
+          "label": "tests external store sync via hooks",
+          "style": "pull",
+          "refs": [
+            "file:packages/react-reconciler/src/__tests__/useSyncExternalStore-test.js",
+            "file:packages/react-reconciler/src/ReactFiberHooks.js",
+            "cluster-A"
+          ],
+          "claim": "Test cases interact with reconciler mutation detection logic but before explicit Activity/offscreen mutation scenario coverage (risk-1)."
+        }
+      ]
+    },
+    "after": {
+      "swimlanes": [
+        "REACT RECONCILER CORE",
+        "TEST SUITE"
+      ],
+      "nodes": [
+        {
+          "id": "fiber-hooks-after",
+          "lane": 0,
+          "label": "ReactFiberHooks.js",
+          "sub": "Updated useSyncExternalStore logic for hidden Activity trees",
+          "type": "mod",
+          "entity_key": "file:packages/react-reconciler/src/ReactFiberHooks.js"
+        },
+        {
+          "id": "usestore-test-after",
+          "lane": 1,
+          "label": "useSyncExternalStore-test.js",
+          "sub": "Tests for hidden/Activity mutation scenarios added or modified",
+          "type": "mod",
+          "entity_key": "file:packages/react-reconciler/src/__tests__/useSyncExternalStore-test.js"
+        }
+      ],
+      "edges": [
+        {
+          "id": "e2",
+          "from": "usestore-test-after",
+          "to": "fiber-hooks-after",
+          "label": "tests extended Activity-tree mutation detection",
+          "style": "pull",
+          "refs": [
+            "cluster-A",
+            "risk-0",
+            "risk-1",
+            "file:packages/react-reconciler/src/__tests__/useSyncExternalStore-test.js",
+            "file:packages/react-reconciler/src/ReactFiberHooks.js"
+          ],
+          "claim": "This link now carries new/tested coverage for missed mutation detection when Activity subtrees are hidden, mitigating the previously untested risk of stale state on Activity boundary transitions (risk-0, risk-1)."
+        }
+      ]
+    }
+  }
+}
