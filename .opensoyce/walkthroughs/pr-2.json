@@ -1,0 +1,285 @@
+{
+  "meta": {
+    "title": "feat: add buildGreeting/shout utility (external Action proof)",
+    "subtitle": "",
+    "filesChanged": 3,
+    "linesAdded": 38,
+    "linesRemoved": 0,
+    "tags": [
+      "phase0-m2"
+    ],
+    "provenance": {
+      "generator": "phase0",
+      "version": "0.1.0-m1",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "generatedAt": "2026-07-13T22:56:23.387Z"
+    }
+  },
+  "overview": {
+    "lead": "Three new utility files are introduced, each exporting a single responsibility function or set of synchronous helpers. These modules are isolated, employ explicit input validation, and avoid side effects or dependency on external state.",
+    "bullets": [
+      {
+        "title": "Greeting and text utilities",
+        "body": "src/greeting.mjs defines buildGreeting, ensuring only non-empty strings are accepted as names (throwing an error otherwise), and shout, which uppercases any input and adds exclamation marks."
+      },
+      {
+        "title": "Farewell message generator",
+        "body": "src/farewell.mjs introduces buildFarewell, which validates its name input and throws on non-conforming arguments, generating a formatted farewell string."
+      },
+      {
+        "title": "Encapsulated counter logic",
+        "body": "src/counter.mjs adds makeCounter, providing next, reset, and value operations with internal state managed via closure, with no impact on outer scope or side effects."
+      }
+    ],
+    "callouts": [
+      {
+        "title": "Input contract enforcement",
+        "body": "Both buildGreeting and buildFarewell include argument checks that result in thrown errors when provided invalid inputs, concentrating risk on usage patterns rather than module behavior."
+      },
+      {
+        "title": "No observed global mutations or side effects",
+        "body": "All introduced functions operate in isolation, modifying only internal state or returning computed values based on arguments."
+      }
+    ]
+  },
+  "clusters": [
+    {
+      "name": "Cluster A · New greeting and shout utilities",
+      "files": [
+        {
+          "path": "src/counter.mjs",
+          "risk": "lo",
+          "riskLabel": "No logic invoked outside this module",
+          "why": "Defines a new makeCounter utility for incrementing, resetting, and accessing a counter value.",
+          "what": "This file introduces the makeCounter function, which encapsulates a numerical counter supporting increment, reset, and value retrieval. The function is self-contained, does not affect global state or perform side-effects, and does not call any external modules or APIs. Its assignment of callbacks and closure-based value storage is observable only through explicit exports.",
+          "beforeType": "gone",
+          "before": [
+            "// no equivalent -- this concept did not exist"
+          ],
+          "after": [
+            "// Third real code change -- run B in the two-run diff-pollution exclusion",
+            "// proof. This run must exclude BOTH the walkthrough committed by the",
+            "// original run and the one committed by run A, showing only real source",
+            "// (greeting.mjs, farewell.mjs, counter.mjs) in its own generated overview.",
+            "",
+            "export function makeCounter(start = 0) {",
+            "  let value = start;",
+            "  return {",
+            "    next: () => (value += 1),",
+            "    reset: () => (value = start),",
+            "    value: () => value,",
+            "  };",
+            "}"
+          ],
+          "annos": [
+            {
+              "text": "The makeCounter function, added in this file, provides three operations (next, reset, value) that manage an internal counter using JavaScript closures. There is no side-effect, global mutation, or external invocation within this logic, so its introduction is confined to the boundaries of its exported behavior. This makes the change isolated to consumers of makeCounter that explicitly import and use it."
+            }
+          ]
+        },
+        {
+          "path": "src/greeting.mjs",
+          "risk": "lo",
+          "riskLabel": "New string utility with straightforward logic; throws on bad input.",
+          "why": "Defines greeting/message-building helpers for external Action demonstration.",
+          "what": "Introduces two standalone exports: buildGreeting, which creates a greeting string and rejects non-string or empty values by throwing; and shout, which uppercases input and appends exclamation marks. These functions perform explicit type and value checks (for buildGreeting), and do not alter state or interact with external systems.",
+          "beforeType": "gone",
+          "before": [
+            "// no equivalent -- this concept did not exist"
+          ],
+          "after": [
+            "// Small utility used by the WIRE-0 external-Action proof PR.",
+            "// Deliberately real code (not a docs-only change) so the pr-walkthrough",
+            "// pipeline has an actual diff to parse, cluster, and risk-assess.",
+            "",
+            "export function buildGreeting(name) {",
+            "  if (typeof name !== 'string' || !name.trim()) {",
+            "    throw new Error('buildGreeting: name must be a non-empty string');",
+            "  }",
+            "  return `Hello, ${name.trim()}! This walkthrough was generated by the public opensoyce-pr-walkthrough-action.`;",
+            "}",
+            "",
+            "export function shout(text) {",
+            "  return String(text).toUpperCase() + '!!!';",
+            "}",
+            ""
+          ],
+          "annos": [
+            {
+              "text": "This file is entirely new and introduces the buildGreeting function, which checks for a non-empty trimmed string argument and throws if invalid, as well as the shout function, which converts any input to a string, uppercases it, and adds exclamation marks. Both utilities run synchronously, and error risk is limited to explicit argument-validation logic."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cluster B · New farewell utility",
+      "files": [
+        {
+          "path": "src/farewell.mjs",
+          "risk": "lo",
+          "riskLabel": "New self-contained string composition utility",
+          "why": "Introduces buildFarewell function for generating farewell messages given a name",
+          "what": "This file introduces a standalone function, buildFarewell, that accepts a name, validates it as a non-empty string, and returns a formatted farewell message. The error is thrown if the input is not a valid string. The implementation is self-contained and does not interact with any external state or resources. Risks are limited to possible input misuse by callers.",
+          "beforeType": "gone",
+          "before": [
+            "// no equivalent -- this concept did not exist"
+          ],
+          "after": [
+            "// Second real code change for the two-run diff-pollution exclusion proof",
+            "// (PR #559 / opensoyce@0.2.1). This run's diff must show ONLY this file --",
+            "// the .opensoyce/walkthroughs/pr-2.json committed by earlier runs must be",
+            "// excluded by the CLI's diff-filter, not reviewed as part of this change.",
+            "",
+            "export function buildFarewell(name) {",
+            "  if (typeof name !== 'string' || !name.trim()) {",
+            "    throw new Error('buildFarewell: name must be a non-empty string');",
+            "  }",
+            "  return `Goodbye, ${name.trim()}! Thanks for testing the diff-pollution fix.`;",
+            "}"
+          ],
+          "annos": [
+            {
+              "text": "A new file is introduced defining the buildFarewell function, which takes a name parameter, enforces it to be a non-empty string, then returns a formatted farewell message. Error handling is provided for invalid arguments. No side effects or external dependencies are present in this utility.",
+              "r": "lo"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "level": "lo",
+      "title": "Argument validation enforces input contract in buildGreeting",
+      "where": "Input to buildGreeting in src/greeting.mjs is checked to ensure it is a non-empty string; otherwise, an error is thrown.",
+      "what": "Callers providing a non-string or an empty (or whitespace-only) argument to buildGreeting will encounter a thrown error. This risk is limited to misuse by consumers passing invalid arguments, as the validation mechanism (typeof and trim checks) is explicit and synchronous.",
+      "entity_refs": [
+        "file:src/greeting.mjs"
+      ]
+    },
+    {
+      "level": "lo",
+      "title": "Error throw on invalid input in buildFarewell",
+      "where": "buildFarewell in src/farewell.mjs performs a type and non-emptiness check on the name parameter, throwing an error on failure.",
+      "what": "Any caller passing a non-string or an empty/whitespace-only string to buildFarewell will receive a thrown error. This impacts only the direct consumers of buildFarewell who do not meet the argument contract, since the function does not interact with external state or systems.",
+      "entity_refs": [
+        "file:src/farewell.mjs"
+      ]
+    },
+    {
+      "level": "lo",
+      "title": "Encapsulation of internal state in makeCounter",
+      "where": "The makeCounter function in src/counter.mjs manages an internal numeric value via closure, exposed only through returned callbacks (next, reset, value).",
+      "what": "Consumers rely solely on the exported methods to interact with the counter state; no unintended side effects or global mutations can occur. Risk is confined to potential misuse by consumers, such as incorrect handling of counter resets or increments.",
+      "entity_refs": [
+        "file:src/counter.mjs"
+      ]
+    }
+  ],
+  "archMap": {
+    "reading": [
+      "Before this PR, the system contains no counter, greeting, or farewell utilities as the relevant files are not present.",
+      "After the PR, three new modules are added: src/greeting.mjs (with a buildGreeting utility and a shout function; cluster A), src/counter.mjs (makeCounter closure with internal state; cluster A), and src/farewell.mjs (buildFarewell utility; cluster B). Each exposes new callable logic for other consumers at the utility layer.",
+      "Risks are confined to input misusage for buildGreeting and buildFarewell (risk-0, risk-1), and consumer handling of makeCounter (risk-2). No shared state or coupling exists between these modules at introduction: edges consist of new module-level boundaries, each independently exposing a set of functions for import by external code."
+    ],
+    "before": {
+      "swimlanes": [
+        "UTILITY LAYER"
+      ],
+      "nodes": [
+        {
+          "id": "external",
+          "lane": 0,
+          "label": "External Consumer",
+          "sub": "No greeting, shout, counter, or farewell API available",
+          "type": "ctx"
+        }
+      ],
+      "edges": []
+    },
+    "after": {
+      "swimlanes": [
+        "UTILITY LAYER"
+      ],
+      "nodes": [
+        {
+          "id": "consumer",
+          "lane": 0,
+          "label": "External Consumer",
+          "sub": "Imports and uses utility exports",
+          "type": "ctx"
+        },
+        {
+          "id": "greeting",
+          "lane": 0,
+          "label": "src/greeting.mjs",
+          "sub": "Exports buildGreeting/shout utilities",
+          "type": "new",
+          "entity_key": "file:src/greeting.mjs"
+        },
+        {
+          "id": "counter",
+          "lane": 0,
+          "label": "src/counter.mjs",
+          "sub": "Exports makeCounter closure",
+          "type": "new",
+          "entity_key": "file:src/counter.mjs"
+        },
+        {
+          "id": "farewell",
+          "lane": 0,
+          "label": "src/farewell.mjs",
+          "sub": "Exports buildFarewell utility",
+          "type": "new",
+          "entity_key": "file:src/farewell.mjs"
+        }
+      ],
+      "edges": [
+        {
+          "id": "ext-greet",
+          "from": "consumer",
+          "to": "greeting",
+          "label": "imports API",
+          "style": "pull",
+          "refs": [
+            "file:src/greeting.mjs",
+            "cluster-A",
+            "risk-0"
+          ],
+          "claim": "External code can now use the exported buildGreeting and shout functions, with argument validation manifesting at this import boundary."
+        },
+        {
+          "id": "ext-counter",
+          "from": "consumer",
+          "to": "counter",
+          "label": "imports API",
+          "style": "pull",
+          "refs": [
+            "file:src/counter.mjs",
+            "cluster-A",
+            "risk-2"
+          ],
+          "claim": "External code accesses makeCounter, which introduces an encapsulated stateful counter via closure."
+        },
+        {
+          "id": "ext-fare",
+          "from": "consumer",
+          "to": "farewell",
+          "label": "imports API",
+          "style": "pull",
+          "refs": [
+            "file:src/farewell.mjs",
+            "cluster-B",
+            "risk-1"
+          ],
+          "claim": "External consumers may now use buildFarewell, where input contract violations surface as thrown errors."
+        }
+      ]
+    }
+  },
+  "smokeTest": [],
+  "summary": "This change introduces three new self-contained utility modules: buildGreeting and shout in src/greeting.mjs, buildFarewell in src/farewell.mjs, and makeCounter in src/counter.mjs. Each function validates its inputs and encapsulates its logic without global side effects or external dependencies. The primary risks relate to input validation: if consumers provide arguments that do not meet required contracts, the functions will throw errors as documented in their respective validation logic.",
+  "footer": "phase0 M2-generate -- 3 file(s), +38/-0 (real, parsed from the diff)"
+}
