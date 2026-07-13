@@ -18,9 +18,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Generate the PR walkthrough
-        uses: freewho99/opensoyce-pr-walkthrough-action@17ffb0cb84a659065823de6c97372a7b23950376
+        uses: freewho99/opensoyce-pr-walkthrough-action@86e494a5f472c38ccf4f9ee05d8671d8c99aaa51
         with:
-          opensoyce-version: '0.2.0'
+          opensoyce-version: '0.2.1'
           pr-url: ${{ github.event.pull_request.html_url }}
           pr-number: ${{ github.event.pull_request.number }}
           repository: ${{ github.repository }}
